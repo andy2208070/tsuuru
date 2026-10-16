@@ -1,0 +1,35 @@
+# Node.js / pnpm
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+*.tsbuildinfo
+vite.config.*.timestamp-*
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Python / uv
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Build and operating-system artifacts
+build/
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+.idea/
+*.swp

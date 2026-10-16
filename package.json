@@ -1,0 +1,19 @@
+{
+  "name": "tsuuru",
+  "private": true,
+  "packageManager": "pnpm@10.12.4",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @tsuuru/portal dev",
+    "dev:all": "pnpm --parallel --filter @tsuuru/portal --filter @tsuuru/web-a --filter @tsuuru/web-b dev",
+    "dev:portal": "pnpm --filter @tsuuru/portal dev",
+    "dev:web-a": "pnpm --filter @tsuuru/web-a dev",
+    "dev:web-b": "pnpm --filter @tsuuru/web-b dev",
+    "build": "pnpm --recursive --if-present build",
+    "typecheck": "pnpm --recursive --if-present typecheck",
+    "tts:dev": "uv run --project services/tts-api --directory services/tts-api uvicorn app.main:app --reload",
+    "tts:test": "uv run --project services/tts-api --directory services/tts-api pytest"
+  }
+}
