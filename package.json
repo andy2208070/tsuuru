@@ -13,7 +13,7 @@
     "dev:web-b": "pnpm --filter @tsuuru/web-b dev",
     "build": "pnpm --recursive --if-present build",
     "typecheck": "pnpm --recursive --if-present typecheck",
-    "tts:dev": "uv run --project services/tts-api --directory services/tts-api uvicorn app.main:app --reload",
-    "tts:test": "uv run --project services/tts-api --directory services/tts-api pytest"
+    "tts:dev": "uv run --directory services/tts-api uvicorn app.main:app --reload",
+    "tts:test": "uv run --directory services/tts-api pytest"
   }
 }

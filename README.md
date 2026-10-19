@@ -13,7 +13,7 @@ A pnpm monorepo for three React applications, shared UI, and a FastAPI text-to-s
 ```powershell
 corepack enable
 pnpm install
-uv sync --project services/tts-api --all-groups
+uv sync --directory services/tts-api --all-groups
 ```
 
 ## Run
