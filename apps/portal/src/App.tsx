@@ -3,16 +3,37 @@ import { BrowserRouter, Link, Route, Routes, useNavigate } from "react-router-do
 
 const projects = [
   {
-    name: "web-a",
-    description: "An independently buildable React application.",
-    port: "5174",
+    name: "tts-web",
+    description: "A Chinese text-to-speech studio powered by Edge TTS.",
+    port: 5174,
+    url: import.meta.env.VITE_TTS_WEB_URL,
+    urlSetting: "VITE_TTS_WEB_URL",
   },
   {
     name: "web-b",
     description: "A React application prepared for container deployment.",
-    port: "5175",
+    port: 5175,
+    url: import.meta.env.VITE_WEB_B_URL,
+    urlSetting: "VITE_WEB_B_URL",
   },
 ];
+
+function getProjectUrl(project: (typeof projects)[number]): string | undefined {
+  if (project.url) {
+    return project.url;
+  }
+
+  if (import.meta.env.DEV) {
+    const url = new URL(window.location.href);
+    url.port = String(project.port);
+    url.pathname = "/";
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  }
+
+  return undefined;
+}
 
 function Home() {
   const navigate = useNavigate();
@@ -57,30 +78,37 @@ function Home() {
           </span>
         </div>
         <div className="grid gap-5 md:grid-cols-2">
-          {projects.map((project, index) => (
-            <article
-              key={project.name}
-              className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-            >
-              <div className="flex items-center justify-between">
-                <span className="grid size-11 place-items-center rounded-xl bg-indigo-50 text-sm font-bold text-indigo-700">
-                  0{index + 1}
-                </span>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  React · Vite
-                </span>
-              </div>
-              <h3 className="mt-6 text-xl font-semibold text-slate-900">{project.name}</h3>
-              <p className="mt-2 min-h-12 leading-6 text-slate-600">{project.description}</p>
-              <p className="mt-4 text-sm text-slate-500">Development port {project.port}</p>
-              <Link
-                className="mt-5 inline-flex text-sm font-semibold text-indigo-700 hover:text-indigo-500"
-                to="/about"
+          {projects.map((project, index) => {
+            const projectUrl = getProjectUrl(project);
+
+            return (
+              <article
+                key={project.name}
+                className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
               >
-                Project details <span aria-hidden="true" className="ml-1">→</span>
-              </Link>
-            </article>
-          ))}
+                <div className="flex items-center justify-between">
+                  <span className="grid size-11 place-items-center rounded-xl bg-indigo-50 text-sm font-bold text-indigo-700">
+                    0{index + 1}
+                  </span>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    React · Vite
+                  </span>
+                </div>
+                <h3 className="mt-6 text-xl font-semibold text-slate-900">{project.name}</h3>
+                <p className="mt-2 min-h-12 leading-6 text-slate-600">{project.description}</p>
+                {projectUrl && (
+                  <a
+                    className="mt-5 inline-flex text-sm font-semibold text-indigo-700 hover:text-indigo-500"
+                    href={projectUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Open project <span aria-hidden="true" className="ml-1">→</span>
+                  </a>
+                )}
+              </article>
+            );
+          })}
         </div>
       </section>
     </main>

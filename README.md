@@ -25,8 +25,11 @@ pnpm dev
 # Run all three frontends in parallel (ports 5173, 5174, and 5175)
 pnpm dev:all
 
-# TTS API at http://localhost:8000
+# Start the API at http://localhost:8000
 pnpm tts:dev
+
+# In another terminal, open the Edge TTS frontend at http://localhost:5174
+pnpm dev:tts-web
 ```
 
 ## Build and test
@@ -34,16 +37,18 @@ pnpm tts:dev
 ```powershell
 pnpm build
 pnpm typecheck
-pnpm --filter @tsuuru/web-a build
+pnpm --filter @tsuuru/tts-web build
 pnpm tts:test
 ```
 
-`web-a` and `web-b` can be built independently using their pnpm filters. Build the containerized `web-b` from the repository root with `docker build -f apps/web-b/Dockerfile -t tsuuru-web-b .`, then run it with `docker run --rm -p 8080:8080 tsuuru-web-b`. Build the TTS API container with `docker build -f services/tts-api/Dockerfile -t tsuuru-tts-api services/tts-api`.
+`tts-web` and `web-b` can be built independently using their pnpm filters. The Edge TTS frontend proxies `/api` to the FastAPI service during local development; for separate deployment, set `VITE_TTS_API_BASE_URL` and include the frontend origin in the API's `TTS_ALLOWED_ORIGINS`. Build the containerized `web-b` from the repository root with `docker build -f apps/web-b/Dockerfile -t tsuuru-web-b .`, then run it with `docker run --rm -p 8080:8080 tsuuru-web-b`. Build the TTS API container with `docker build -f services/tts-api/Dockerfile -t tsuuru-tts-api services/tts-api`.
+
+For production portal builds, set `VITE_TTS_WEB_URL` and `VITE_WEB_B_URL` to the public URLs of the respective frontend apps before building. These values are embedded at build time. During development, the portal uses the current host and protocol with each app's configured Vite port: portal on 5173, `tts-web` on 5174, and `web-b` on 5175.
 
 ## Workspace layout
 
 - `apps/portal`: main entry portal
-- `apps/web-a`: independently buildable sub-project
+- `apps/tts-web`: independently buildable Edge TTS frontend
 - `apps/web-b`: containerized sub-project
 - `packages/shared-ui`: shared React components
-- `services/tts-api`: FastAPI TTS service scaffold with `GET /health`
+- `services/tts-api`: FastAPI Edge TTS service with `GET /health`, `GET /api/voices`, and `POST /api/tts`

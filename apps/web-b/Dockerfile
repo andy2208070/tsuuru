@@ -5,7 +5,7 @@ RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/portal/package.json apps/portal/package.json
-COPY apps/web-a/package.json apps/web-a/package.json
+COPY apps/tts-web/package.json apps/tts-web/package.json
 COPY apps/web-b/package.json apps/web-b/package.json
 COPY packages/shared-ui/package.json packages/shared-ui/package.json
 RUN pnpm install --frozen-lockfile

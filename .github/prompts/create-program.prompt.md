@@ -48,7 +48,7 @@ tsuuru/
 │  │  ├─ tsconfig.json           # extends ../../tsconfig.base.json
 │  │  ├─ vite.config.ts
 │  │  └─ src/
-│  ├─ web-a/                     # Sub-project A (can be built independently)
+│  ├─ tts-web/                   # Edge TTS frontend (can be built independently)
 │  │  ├─ package.json
 │  │  ├─ tsconfig.json           # extends ../../tsconfig.base.json
 │  │  ├─ vite.config.ts
@@ -78,7 +78,7 @@ tsuuru/
 
 1. **`pnpm-workspace.yaml`** should include all packages under `apps/\*` and `packages/\*`.
 2. **`tsconfig.base.json`** should define shared compiler options; all app-level `tsconfig.json` files should extend it.
-3. Each frontend app (`portal`, `web-a`, `web-b`) should be initialized with:
+3. Each frontend app (`portal`, `tts-web`, `web-b`) should be initialized with:
    - React + TypeScript template via Vite
    - Tailwind CSS configured
    - React Router installed
