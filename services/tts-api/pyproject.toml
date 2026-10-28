@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Text-to-speech API service for the tsuuru monorepo"
 requires-python = ">=3.11"
 dependencies = [
+    "edge-tts>=7.0.0,<8.0.0",
     "fastapi>=0.115.0,<1.0.0",
     "uvicorn[standard]>=0.34.0,<1.0.0",
 ]
