@@ -43,6 +43,8 @@ pnpm tts:test
 
 `tts-web` and `web-b` can be built independently using their pnpm filters. The Edge TTS frontend proxies `/api` to the FastAPI service during local development; for separate deployment, set `VITE_TTS_API_BASE_URL` and include the frontend origin in the API's `TTS_ALLOWED_ORIGINS`. Build the containerized `web-b` from the repository root with `docker build -f apps/web-b/Dockerfile -t tsuuru-web-b .`, then run it with `docker run --rm -p 8080:8080 tsuuru-web-b`. Build the TTS API container with `docker build -f services/tts-api/Dockerfile -t tsuuru-tts-api services/tts-api`.
 
+The TTS API adds certificates from the operating system trust store to Edge TTS's bundled certificates. If a local HTTPS-inspection proxy uses a CA that is not installed in the operating system trust store, set `TTS_CA_BUNDLE` to that CA's PEM file before starting the API. TLS certificate verification remains enabled.
+
 For production portal builds, set `VITE_TTS_WEB_URL` and `VITE_WEB_B_URL` to the public URLs of the respective frontend apps before building. These values are embedded at build time. During development, the portal uses the current host and protocol with each app's configured Vite port: portal on 5173, `tts-web` on 5174, and `web-b` on 5175.
 
 ## Workspace layout

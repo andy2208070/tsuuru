@@ -3,7 +3,27 @@ import base64
 import httpx
 import pytest
 
-from app.main import app
+from app.main import app, configure_edge_tts_ssl_context
+
+
+def test_edge_tts_ssl_context_loads_system_and_additional_ca(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str | None]] = []
+
+    class FakeSSLContext:
+        def load_default_certs(self) -> None:
+            calls.append(("system", None))
+
+        def load_verify_locations(self, *, cafile: str) -> None:
+            calls.append(("bundle", cafile))
+
+    monkeypatch.setattr("app.main.edge_tts_communicate._SSL_CTX", FakeSSLContext())
+    monkeypatch.setenv("TTS_CA_BUNDLE", "C:/certs/proxy-ca.pem")
+
+    configure_edge_tts_ssl_context()
+
+    assert calls == [("system", None), ("bundle", "C:/certs/proxy-ca.pem")]
 
 
 @pytest.mark.anyio

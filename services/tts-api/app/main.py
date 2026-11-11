@@ -3,11 +3,25 @@ import logging
 import os
 
 import edge_tts
+import edge_tts.communicate as edge_tts_communicate
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
+
+
+def configure_edge_tts_ssl_context() -> None:
+    """Trust OS certificates and an optional additional CA for Edge TTS."""
+    ssl_context = edge_tts_communicate._SSL_CTX
+    ssl_context.load_default_certs()
+
+    ca_bundle = os.getenv("TTS_CA_BUNDLE")
+    if ca_bundle:
+        ssl_context.load_verify_locations(cafile=ca_bundle)
+
+
+configure_edge_tts_ssl_context()
 
 VOICE_CATALOG: tuple[dict[str, str], ...] = (
     {
