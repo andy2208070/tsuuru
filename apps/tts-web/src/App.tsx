@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@tsuuru/shared-ui";
 import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
 
@@ -21,9 +21,14 @@ type SynthesisResponse = {
   detail?: string;
 };
 
+type SynthesisStreamEvent =
+  | { type: "progress"; progress: number; message: string }
+  | { type: "complete"; progress: number; result: SynthesisResponse }
+  | { type: "error"; detail: string };
+
 type ServiceState = "checking" | "online" | "offline";
 
-const MAX_CHARACTERS = 3000;
+const TASK_CHARACTERS = 3000;
 const API_BASE_URL = (import.meta.env.VITE_TTS_API_BASE_URL ?? "").replace(/\/+$/, "");
 const VOICE_STORAGE_KEY = "tsuuru.tts.selectedVoice";
 
@@ -40,6 +45,8 @@ const DEFAULT_VOICES: Voice[] = [
 
 const SAMPLE_TEXT =
   "Welcome to the text-to-speech studio!\n\nEnter or paste your text, choose a voice, and adjust the speed and pitch to create natural-sounding audio. You can also generate subtitles for your videos.";
+const VOICE_PREVIEW_TEXT_ENGLISH = "Small steps every day lead to big results.";
+const VOICE_PREVIEW_TEXT_CHINESE = "滾滾長江東逝水";
 
 const highlights = [
   { icon: "8", title: "8 Mandarin voices", detail: "Professional voices for a range of content" },
@@ -54,7 +61,7 @@ const featureCards = [
 ];
 
 const usageSteps = [
-  { number: "01", title: "Enter your text", text: "Paste or type up to 3,000 characters." },
+  { number: "01", title: "Enter your text", text: "Paste or type any amount of text. Long text is split into synthesis tasks." },
   { number: "02", title: "Choose a voice", text: "Select a voice from the Mandarin collection." },
   { number: "03", title: "Adjust settings", text: "Set the speed and pitch, and choose whether to include subtitles." },
   { number: "04", title: "Preview and download", text: "Listen to the result, then save the audio or subtitle file." },
@@ -87,6 +94,64 @@ function decodeBase64(value: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+async function readSynthesisStream(
+  response: Response,
+  onProgress: (progress: number, message: string) => void,
+): Promise<SynthesisResponse> {
+  if (!response.ok) {
+    const result = (await response.json().catch(() => ({}))) as SynthesisResponse;
+    throw new Error(result.detail ?? "Speech synthesis failed. Please try again later.");
+  }
+  if (!response.body) {
+    throw new Error("Progress updates are unavailable. Please try again.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+  let synthesisResult: SynthesisResponse | null = null;
+
+  function processLine(line: string) {
+    if (!line.trim()) {
+      return;
+    }
+    const event = JSON.parse(line) as SynthesisStreamEvent;
+    if (event.type === "progress") {
+      onProgress(event.progress, event.message);
+    } else if (event.type === "error") {
+      throw new Error(event.detail);
+    } else {
+      synthesisResult = event.result;
+      onProgress(event.progress, "Finishing your audio...");
+    }
+  }
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (value) {
+      pending += decoder.decode(value, { stream: true });
+    }
+
+    let newlineIndex = pending.indexOf("\n");
+    while (newlineIndex >= 0) {
+      processLine(pending.slice(0, newlineIndex));
+      pending = pending.slice(newlineIndex + 1);
+      newlineIndex = pending.indexOf("\n");
+    }
+
+    if (done) {
+      pending += decoder.decode();
+      processLine(pending);
+      break;
+    }
+  }
+
+  if (!synthesisResult) {
+    throw new Error("The service did not return any audio. Please try again.");
+  }
+  return synthesisResult;
 }
 
 function SiteHeader() {
@@ -132,11 +197,23 @@ function TTSStudio() {
   const [includeSubtitle, setIncludeSubtitle] = useState(false);
   const [voiceServiceState, setVoiceServiceState] = useState<ServiceState>("checking");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationMessage, setGenerationMessage] = useState("");
+  const [previewState, setPreviewState] = useState<{
+    voiceName: string;
+    status: "loading" | "playing";
+  } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [subtitleSrt, setSubtitleSrt] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
+  const previewRequestId = useRef(0);
+  const previewAbortRef = useRef<AbortController | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
   const activeVoice = voices.find((voice) => voice.name === selectedVoice) ?? DEFAULT_VOICES[0];
+  const characterCount = Array.from(text).length;
+  const taskCount = Math.ceil(characterCount / TASK_CHARACTERS);
 
   useEffect(() => {
     let isMounted = true;
@@ -186,7 +263,104 @@ function TTSStudio() {
     return () => URL.revokeObjectURL(audioUrl);
   }, [audioUrl]);
 
+  useEffect(() => () => {
+    previewRequestId.current += 1;
+    previewAbortRef.current?.abort();
+    clearPreviewAudio();
+  }, []);
+
+  function clearPreviewAudio() {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.onended = null;
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+  }
+
+  function stopVoicePreview() {
+    previewRequestId.current += 1;
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    clearPreviewAudio();
+    setPreviewState(null);
+  }
+
+  async function handleVoicePreview(voice: Voice) {
+    if (previewState?.voiceName === voice.name) {
+      stopVoicePreview();
+      return;
+    }
+
+    stopVoicePreview();
+    const requestId = previewRequestId.current;
+    const abortController = new AbortController();
+    previewAbortRef.current = abortController;
+    setPreviewState({ voiceName: voice.name, status: "loading" });
+
+    try {
+      const sampleText = voice.language.toLowerCase().startsWith("zh")
+        ? VOICE_PREVIEW_TEXT_CHINESE
+        : VOICE_PREVIEW_TEXT_ENGLISH;
+      const response = await fetch(apiUrl("/api/tts"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          text: sampleText,
+          voice: voice.name,
+          subtitle: false,
+          speed,
+          pitch,
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as SynthesisResponse;
+      if (!response.ok) {
+        throw new Error(result.detail ?? "Voice preview failed. Please try again.");
+      }
+      if (!result.audio_base64) {
+        throw new Error("The service did not return preview audio.");
+      }
+      if (requestId !== previewRequestId.current) {
+        return;
+      }
+
+      const audioBytes = decodeBase64(result.audio_base64);
+      const audioBuffer = new ArrayBuffer(audioBytes.byteLength);
+      new Uint8Array(audioBuffer).set(audioBytes);
+      const previewUrl = URL.createObjectURL(
+        new Blob([audioBuffer], { type: result.mime_type ?? "audio/mpeg" }),
+      );
+      const previewAudio = new Audio(previewUrl);
+      previewUrlRef.current = previewUrl;
+      previewAudioRef.current = previewAudio;
+      previewAudio.onended = () => {
+        if (requestId === previewRequestId.current) {
+          clearPreviewAudio();
+          setPreviewState(null);
+        }
+      };
+      setPreviewState({ voiceName: voice.name, status: "playing" });
+      await previewAudio.play();
+      previewAbortRef.current = null;
+    } catch (error) {
+      if (requestId !== previewRequestId.current) {
+        return;
+      }
+      clearPreviewAudio();
+      setPreviewState(null);
+      setNotice({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Voice preview failed. Please try again.",
+      });
+    }
+  }
+
   function chooseVoice(name: string) {
+    stopVoicePreview();
     setSelectedVoice(name);
     rememberVoice(name);
   }
@@ -199,13 +373,16 @@ function TTSStudio() {
       return;
     }
 
+    stopVoicePreview();
     setIsGenerating(true);
+    setGenerationProgress(1);
+    setGenerationMessage("Preparing your text...");
     setAudioUrl(null);
     setSubtitleSrt("");
     setNotice({ kind: "info", message: "Generating speech. Please wait..." });
 
     try {
-      const response = await fetch(apiUrl("/api/tts"), {
+      const response = await fetch(apiUrl("/api/tts/stream"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -216,11 +393,10 @@ function TTSStudio() {
           pitch,
         }),
       });
-      const result = (await response.json().catch(() => ({}))) as SynthesisResponse;
-
-      if (!response.ok) {
-        throw new Error(result.detail ?? "Speech synthesis failed. Please try again later.");
-      }
+      const result = await readSynthesisStream(response, (progress, message) => {
+        setGenerationProgress(progress);
+        setGenerationMessage(message);
+      });
       if (!result.audio_base64) {
         throw new Error("The service did not return any audio. Please try again.");
       }
@@ -295,14 +471,13 @@ function TTSStudio() {
                 <p className="step-label">01 / Text</p>
                 <h2 id="editor-title">Enter the text to convert</h2>
               </div>
-              <span className="character-count">{text.length.toLocaleString()} <span>/ {MAX_CHARACTERS.toLocaleString()}</span></span>
+              <span className="character-count">{characterCount.toLocaleString()} characters · {taskCount.toLocaleString()} tasks</span>
             </div>
 
             <div className="text-input-wrap">
               <label className="sr-only" htmlFor="tts-text">Text to convert</label>
               <textarea
                 id="tts-text"
-                maxLength={MAX_CHARACTERS}
                 onChange={(event) => setText(event.currentTarget.value)}
                 placeholder="Type or paste the text you want to convert..."
                 value={text}
@@ -311,7 +486,7 @@ function TTSStudio() {
             </div>
 
             <div className="editor-toolbar">
-              <span>Supports Mandarin and English, up to 3,000 characters</span>
+              <span>Long text is automatically split into tasks of up to 3,000 characters.</span>
               <div className="text-actions">
                 <button onClick={() => setText(SAMPLE_TEXT)} type="button">Load sample</button>
                 <button onClick={() => setText("")} type="button">Clear text</button>
@@ -434,12 +609,9 @@ function TTSStudio() {
               {voices.map((voice) => {
                 const isSelected = selectedVoice === voice.name;
                 const [name, description] = voice.description.split(" - ");
+                const isPreviewActive = previewState?.voiceName === voice.name;
                 return (
-                  <label
-                    className={`voice-option${isSelected ? " selected" : ""}`}
-                    htmlFor={`voice-${voice.name}`}
-                    key={voice.name}
-                  >
+                  <div className={`voice-option${isSelected ? " selected" : ""}`} key={voice.name}>
                     <input
                       checked={isSelected}
                       id={`voice-${voice.name}`}
@@ -448,15 +620,41 @@ function TTSStudio() {
                       type="radio"
                       value={voice.name}
                     />
-                    <span aria-hidden="true" className={`voice-avatar ${voice.gender === "Male" ? "avatar-male" : "avatar-female"}`}>
-                      {voice.gender === "Male" ? "M" : "F"}
-                    </span>
-                    <span className="voice-option-copy">
-                      <strong>{name ?? voice.description}</strong>
-                      <small>{description ?? voice.language}</small>
-                    </span>
-                    <span aria-hidden="true" className="voice-check">✓</span>
-                  </label>
+                    <label className="voice-option-select" htmlFor={`voice-${voice.name}`}>
+                      <span aria-hidden="true" className={`voice-avatar ${voice.gender === "Male" ? "avatar-male" : "avatar-female"}`}>
+                        {voice.gender === "Male" ? "M" : "F"}
+                      </span>
+                      <span className="voice-option-copy">
+                        <strong>{name ?? voice.description}</strong>
+                        <small>{description ?? voice.language}</small>
+                      </span>
+                      <span aria-hidden="true" className="voice-check">✓</span>
+                    </label>
+                    <button
+                      aria-label={isPreviewActive
+                        ? previewState.status === "loading"
+                          ? `Loading preview for ${name ?? voice.name}`
+                          : `Stop preview for ${name ?? voice.name}`
+                        : `Play preview for ${name ?? voice.name}`}
+                      className={`voice-preview-button${isPreviewActive ? " preview-active" : ""}`}
+                      disabled={isGenerating}
+                      onClick={() => void handleVoicePreview(voice)}
+                      title={isPreviewActive ? "Stop preview" : "Preview voice"}
+                      type="button"
+                    >
+                      {isPreviewActive && previewState.status === "loading" ? (
+                        <span aria-hidden="true" className="preview-spinner" />
+                      ) : isPreviewActive ? (
+                        <svg aria-hidden="true" viewBox="0 0 16 16">
+                          <path d="M5 3.5v9M11 3.5v9" />
+                        </svg>
+                      ) : (
+                        <svg aria-hidden="true" viewBox="0 0 16 16">
+                          <path d="m5 3.5 7 4.5-7 4.5z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -481,7 +679,28 @@ function TTSStudio() {
               {isGenerating ? "Generating..." : "Convert to speech"}
               {!isGenerating && <span aria-hidden="true" className="button-arrow">→</span>}
             </button>
-            <p className="voice-footnote">Up to 3,000 characters · Audio is available for download during this session</p>
+            {isGenerating && (
+              <div className="generation-progress">
+                <div className="generation-progress-heading">
+                  <span>{generationMessage}</span>
+                  <strong>{generationProgress}%</strong>
+                </div>
+                <div
+                  aria-label="Speech generation progress"
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={generationProgress}
+                  className="generation-progress-track"
+                  role="progressbar"
+                >
+                  <span style={{ width: `${generationProgress}%` }} />
+                </div>
+                <span className="generation-progress-detail">
+                  Processing {taskCount} {taskCount === 1 ? "task" : "tasks"}
+                </span>
+              </div>
+            )}
+            <p className="voice-footnote">No character limit · Long text is processed as multiple tasks</p>
           </aside>
         </form>
 

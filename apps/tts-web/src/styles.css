@@ -688,6 +688,16 @@ textarea:focus-visible {
 	box-shadow: 0 3px 9px rgb(67 97 238 / 8%);
 }
 
+.voice-option-select {
+	display: flex;
+	min-width: 0;
+	min-height: 36px;
+	flex: 1;
+	align-items: center;
+	gap: 10px;
+	cursor: pointer;
+}
+
 .voice-option input {
 	position: absolute;
 	width: 1px;
@@ -698,9 +708,57 @@ textarea:focus-visible {
 	white-space: nowrap;
 }
 
-.voice-option input:focus-visible + .voice-avatar {
+.voice-option input:focus-visible + .voice-option-select {
 	outline: 3px solid rgb(67 97 238 / 35%);
 	outline-offset: 2px;
+}
+
+.voice-preview-button {
+	display: grid;
+	width: 30px;
+	height: 30px;
+	flex: 0 0 auto;
+	place-items: center;
+	padding: 0;
+	border: 1px solid #e1e6f1;
+	border-radius: 9px;
+	background: #fff;
+	color: #6578d2;
+	transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.voice-preview-button:hover:not(:disabled),
+.voice-preview-button.preview-active {
+	border-color: #aebcff;
+	background: #edf1ff;
+	color: #4361ee;
+}
+
+.voice-preview-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.voice-preview-button svg {
+	width: 14px;
+	height: 14px;
+}
+
+.voice-preview-button svg path {
+	fill: currentColor;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.6;
+}
+
+.preview-spinner {
+	width: 13px;
+	height: 13px;
+	border: 1.5px solid #cbd4ff;
+	border-top-color: #4f69ec;
+	border-radius: 50%;
+	animation: spin 750ms linear infinite;
 }
 
 .voice-avatar {
@@ -884,6 +942,57 @@ textarea:focus-visible {
 .convert-button:disabled {
 	cursor: not-allowed;
 	opacity: 0.65;
+}
+
+.generation-progress {
+	display: grid;
+	gap: 8px;
+	margin-top: 13px;
+	padding: 11px 12px;
+	border: 1px solid #dfe6fb;
+	border-radius: 10px;
+	background: #fff;
+}
+
+.generation-progress-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	color: #657187;
+	font-size: 10px;
+}
+
+.generation-progress-heading span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.generation-progress-heading strong {
+	flex: 0 0 auto;
+	color: #4b64df;
+	font-size: 10px;
+}
+
+.generation-progress-track {
+	height: 7px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: #e9edfa;
+}
+
+.generation-progress-track > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, #7189f6, #4361ee);
+	transition: width 240ms ease;
+}
+
+.generation-progress-detail {
+	color: #9aa4b4;
+	font-size: 9px;
 }
 
 .button-arrow {
