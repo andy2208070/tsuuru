@@ -45,7 +45,7 @@ importers:
         specifier: ^7.1.10
         version: 7.3.7(jiti@2.7.0)(lightningcss@1.32.0)
 
-  apps/web-a:
+  apps/tts-web:
     dependencies:
       '@tsuuru/shared-ui':
         specifier: workspace:*

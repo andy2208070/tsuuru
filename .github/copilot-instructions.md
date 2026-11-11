@@ -1,5 +1,9 @@
 # tsuuru workspace guidance
 
+## Language policy
+
+- Use English exclusively for all project-authored content, including source code, identifiers, comments, UI text, documentation, tests, and configuration text. Do not add non-English text to the project.
+
 ## Project architecture
 
 - Treat tsuuru as a monorepo containing a portal, independently buildable frontend sub-projects, shared frontend packages, and a text-to-speech (TTS) API service.

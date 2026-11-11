@@ -7,9 +7,9 @@
   },
   "scripts": {
     "dev": "pnpm --filter @tsuuru/portal dev",
-    "dev:all": "pnpm --parallel --filter @tsuuru/portal --filter @tsuuru/web-a --filter @tsuuru/web-b dev",
+    "dev:all": "pnpm --parallel --filter @tsuuru/portal --filter @tsuuru/tts-web --filter @tsuuru/web-b dev",
     "dev:portal": "pnpm --filter @tsuuru/portal dev",
-    "dev:web-a": "pnpm --filter @tsuuru/web-a dev",
+    "dev:tts-web": "pnpm --filter @tsuuru/tts-web dev",
     "dev:web-b": "pnpm --filter @tsuuru/web-b dev",
     "build": "pnpm --recursive --if-present build",
     "typecheck": "pnpm --recursive --if-present typecheck",
